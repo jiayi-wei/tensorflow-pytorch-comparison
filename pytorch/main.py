@@ -3,9 +3,12 @@
 # -*- coding: utf-8 -*-
 
 import torch
+import torch.nn.functional as F
 import torchvision
 import numpy as np
 import mnist
+import os
+
 
 n_epochs = 5
 batch_size_train = 64
@@ -21,90 +24,100 @@ train_image, train_label = data.load_training()
 test_image, test_label = data.load_testing()
 train_size = len(train_image)
 test_size = len(test_image)
-ds_train = tf.data.Dataset.from_tensor_slices((train_image, train_label))
-ds_test = tf.data.Dataset.from_tensor_slices((test_image, test_label))
 
 
-ds_train = ds_train.map(lambda it1, it2: tf.numpy_function(normalize_img,
-                                                           [it1, it2],
-                                                           [tf.float32, tf.int32]),
-                        num_parallel_calls=tf.data.experimental.AUTOTUNE)
-ds_train = ds_train.shuffle(100).batch(batch_size_train)
-ds_train = ds_train.prefetch(tf.data.experimental.AUTOTUNE)
+class Dataset(torch.utils.data.Dataset):
+    def __init__(self, images, labels, trans=None):
+        self.images = images
+        self.labels = labels
+        self.trans = trans
 
-ds_test = ds_test.map(lambda it1, it2: tf.numpy_function(normalize_img,
-                                                         [it1, it2],
-                                                         [tf.float32, tf.int32]),
-                      num_parallel_calls=tf.data.experimental.AUTOTUNE)
-ds_test = ds_test.batch(batch_size_test)
-ds_test = ds_test.prefetch(tf.data.experimental.AUTOTUNE)
+    def __len__(self):
+        return len(self.labels)
+
+    def __getitem__(self, idx):
+        img = np.array(self.images[idx])
+        img = np.reshape(img, (28, 28))
+        # print(img.shape)
+        img = np.expand_dims(img, axis=-1)
+        # print(img.shape)
+        if self.trans:
+            img = self.trans(img)
+        return img, self.labels[idx]
 
 
-class Net(tf.keras.Model):
+train_loader = torch.utils.data.DataLoader(Dataset(train_image, train_label,
+                                                   trans=torchvision.transforms.ToTensor()),
+                                           batch_size=batch_size_train, shuffle=True)
+test_loader = torch.utils.data.DataLoader(Dataset(test_image, test_label,
+                                                  trans=torchvision.transforms.ToTensor()),
+                                          batch_size=batch_size_test, shuffle=False)
+
+
+class Net(torch.nn.Module):
     def __init__(self, training=True):
         super(Net, self).__init__()
-        self.conv1 = tf.keras.layers.Conv2D(10, 5)
-        self.conv2 = tf.keras.layers.Conv2D(20, 5)
-        self.dropout = tf.keras.layers.Dropout(rate=0.2)
-        self.fc1 = tf.keras.layers.Dense(50)
-        self.fc2 = tf.keras.layers.Dense(10)
+        self.conv1 = torch.nn.Conv2d(1, 10, 5)
+        self.conv2 = torch.nn.Conv2d(10, 20, 5)
+        self.dropout = torch.nn.Dropout2d(p=0.2)
+        self.fc1 = torch.nn.Linear(320, 50)
+        self.fc2 = torch.nn.Linear(50, 10)
 
-    def call(self, x):
-        x = tf.nn.relu(tf.nn.max_pool2d(self.conv1(x),
-                                        ksize=2,
-                                        strides=2,
-                                        padding='VALID'))
+    def forward(self, x):
+        x = F.relu(F.max_pool2d(self.conv1(x), 2))
         x = self.dropout(self.conv2(x))
-        x = tf.nn.relu(tf.nn.max_pool2d(x, ksize=2,
-                                        strides=2,
-                                        padding='VALID'))
-        x = tf.reshape(x, (x.shape[0], -1))
-        x = tf.nn.relu(self.fc1(x))
-        x = tf.nn.dropout(x, rate=0.2)
-        x = tf.nn.softmax(self.fc2(x))
+        x = F.relu(F.max_pool2d(x, 2))
+        x = x.view(-1, 320)
+        x = F.relu(self.fc1(x))
+        x = F.dropout(x, p=0.2)
+        x = F.log_softmax(self.fc2(x), dim=1)
         return x
 
 
 network = Net()
-optim = tf.keras.optimizers.SGD(learning_rate=learning_rate,
-                                momentum=momentum)
-loss_object = tf.keras.losses.SparseCategoricalCrossentropy()
+optim = torch.optim.SGD(network.parameters(),
+                        lr=learning_rate,
+                        momentum=momentum)
+loss_object = torch.nn.NLLLoss()
 
 train_losses = []
 test_losses = []
 
 
 def train(epoch):
-    for batch_idx, (data, target) in enumerate(ds_train):
-        with tf.GradientTape() as tape:
-            output = network(data)
-            loss = loss_object(target, output)
-        trainable_variables = network.trainable_variables
-        gradients = tape.gradient(loss, trainable_variables)
-        optim.apply_gradients(zip(gradients, trainable_variables))
+    network.train()
+    for batch_idx, (data, target) in enumerate(train_loader):
+        optim.zero_grad()
+        output = network(data.float())
+        loss = loss_object(output, target)
+        loss.backward()
+        optim.step()
         if batch_idx % log_interval == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                    epoch, batch_idx * batch_size_train, train_size,
-                    100. * batch_idx * batch_size_train / train_size,
-                    loss.numpy()))
-            train_losses.append(loss.numpy())
-    network.save_weights("./results/model_e{}".format(epoch))
+                    epoch, batch_idx * len(data), len(train_loader.dataset),
+                    100. * batch_idx / len(train_loader), loss.item()))
+            train_losses.append(loss.item())
+    torch.save(network.state_dict(), "./results/model_e{}.pth".format(epoch))
 
 
 def test():
+    network.eval()
     test_loss = 0
     correct = 0
-    for data, target in ds_test:
-        output = network(data)
-        test_loss += loss_object(target, output).numpy()
-        pred = tf.cast(tf.math.argmax(output, axis=1), dtype=tf.int32)
-        correct += tf.math.count_nonzero(tf.math.equal(pred, target)).numpy()
+    with torch.no_grad():
+        for data, target in test_loader:
+            output = network(data.float())
+            test_loss += loss_object(output, target).item()
+            pred = output.data.max(1, keepdim=True)[1]
+            correct += pred.eq(target.data.view_as(pred)).sum()
     test_losses.append(test_loss)
     print('\nTest set: Avg. loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
-        test_loss, correct, test_size,
-        100. * correct / test_size))
+          test_loss, correct, len(test_loader.dataset),
+          100. * correct / len(test_loader.dataset)))
 
 
+if not os.path.exists("./results"):
+    os.mkdir("./results")
 test()
 for epoch in range(1, n_epochs+1):
     train(epoch)
