@@ -2,8 +2,8 @@
 
 # -*- coding: utf-8 -*-
 
-import tensorflow as tf
-# import tensorflow_datasets
+import torch
+import torchvision
 import numpy as np
 import mnist
 
@@ -23,14 +23,6 @@ train_size = len(train_image)
 test_size = len(test_image)
 ds_train = tf.data.Dataset.from_tensor_slices((train_image, train_label))
 ds_test = tf.data.Dataset.from_tensor_slices((test_image, test_label))
-
-
-def normalize_img(image, label):
-    """Normalizes images: `uint8` -> `float32`."""
-    image = np.array(image)
-    image = np.reshape(image, (28, 28))
-    image = np.expand_dims(image, axis=-1)
-    return tf.cast(image, tf.float32) / 255., label
 
 
 ds_train = ds_train.map(lambda it1, it2: tf.numpy_function(normalize_img,
