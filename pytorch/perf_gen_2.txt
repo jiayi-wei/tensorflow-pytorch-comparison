@@ -1,0 +1,20 @@
+# started on Wed May 27 14:09:59 2020
+
+
+ Performance counter stats for 'python main.py':
+
+      1,932,745.79 msec task-clock                #   13.270 CPUs utilized          
+           969,781      context-switches          #    0.502 K/sec                  
+           159,434      cpu-migrations            #    0.082 K/sec                  
+         2,961,905      page-faults               #    0.002 M/sec                  
+ 3,453,830,805,705      cycles                    #    1.787 GHz                    
+ 1,906,572,324,087      instructions              #    0.55  insn per cycle         
+   418,398,289,681      branches                  #  216.479 M/sec                  
+     1,716,531,022      branch-misses             #    0.41% of all branches        
+
+     145.650824095 seconds time elapsed
+
+    1874.703539000 seconds user
+      79.660703000 seconds sys
+
+

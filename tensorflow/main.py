@@ -91,10 +91,10 @@ def train(epoch):
         gradients = tape.gradient(loss, trainable_variables)
         optim.apply_gradients(zip(gradients, trainable_variables))
         if batch_idx % log_interval == 0:
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                    epoch, batch_idx * batch_size_train, train_size,
-                    100. * batch_idx * batch_size_train / train_size,
-                    loss.numpy()))
+            # print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+            #        epoch, batch_idx * batch_size_train, train_size,
+            #        100. * batch_idx * batch_size_train / train_size,
+            #        loss.numpy()))
             train_losses.append(loss.numpy())
     network.save_weights("./results/model_e{}".format(epoch))
 
@@ -108,9 +108,9 @@ def test():
         pred = tf.cast(tf.math.argmax(output, axis=1), dtype=tf.int32)
         correct += tf.math.count_nonzero(tf.math.equal(pred, target)).numpy()
     test_losses.append(test_loss)
-    print('\nTest set: Avg. loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
-        test_loss, correct, test_size,
-        100. * correct / test_size))
+    # print('\nTest set: Avg. loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
+    #     test_loss, correct, test_size,
+    #     100. * correct / test_size))
 
 
 test()

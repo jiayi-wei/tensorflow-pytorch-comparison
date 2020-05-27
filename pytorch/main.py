@@ -93,9 +93,9 @@ def train(epoch):
         loss.backward()
         optim.step()
         if batch_idx % log_interval == 0:
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                    epoch, batch_idx * len(data), len(train_loader.dataset),
-                    100. * batch_idx / len(train_loader), loss.item()))
+            # print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+            #        epoch, batch_idx * len(data), len(train_loader.dataset),
+            #        100. * batch_idx / len(train_loader), loss.item()))
             train_losses.append(loss.item())
     torch.save(network.state_dict(), "./results/model_e{}.pth".format(epoch))
 
@@ -111,9 +111,9 @@ def test():
             pred = output.data.max(1, keepdim=True)[1]
             correct += pred.eq(target.data.view_as(pred)).sum()
     test_losses.append(test_loss)
-    print('\nTest set: Avg. loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
-          test_loss, correct, len(test_loader.dataset),
-          100. * correct / len(test_loader.dataset)))
+    # print('\nTest set: Avg. loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
+    #      test_loss, correct, len(test_loader.dataset),
+    #      100. * correct / len(test_loader.dataset)))
 
 
 if not os.path.exists("./results"):
